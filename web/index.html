@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>焊缝特征提取研发平台</title>
+    <link rel="stylesheet" href="static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header>
+            <h1>🔬 焊缝特征提取研发平台</h1>
+            <p class="subtitle">基于OpenCASCADE的自动化焊缝识别算法验证</p>
+        </header>
+
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <!-- 左侧控制面板 -->
+            <div class="left-panel">
+                <!-- STEP文件上传 -->
+                <div class="card">
+                    <h3>📁 STEP文件上传</h3>
+
+                    <div id="uploadArea" class="upload-area">
+                        <div class="upload-placeholder">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M9 16h6v-6h4l-7-7-7 7h4zm-4 2h14v2H5z"/>
+                            </svg>
+                            <p>点击或拖拽STEP/STP文件到此处</p>
+                            <p class="file-info">支持格式：.step, .stp (最大100MB)</p>
+                        </div>
+                        <input type="file" id="fileInput" accept=".step,.stp" hidden>
+                    </div>
+
+                    <div id="fileInfo" style="display: none;">
+                        <div class="file-info-display">
+                            <span id="fileName">filename.step</span>
+                            <button class="btn-small" onclick="clearFile()">清除</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 检测参数设置 -->
+                <div class="card">
+                    <h3>⚙️ 检测参数设置</h3>
+
+                    <h4>角焊缝 (Fillet)</h4>
+                    <div class="param-group">
+                        <div class="param-item">
+                            <label>角度范围:</label>
+                            <input type="number" id="fillet-min-angle" value="60" min="0" max="180">
+                            <span>-</span>
+                            <input type="number" id="fillet-max-angle" value="120" min="0" max="180">
+                            <span>°</span>
+                        </div>
+                        <div class="param-item">
+                            <label>最小长度:</label>
+                            <input type="number" id="fillet-min-length" value="5" min="0" step="0.1">
+                            <span>mm</span>
+                        </div>
+                    </div>
+
+                    <h4>对接焊缝 (Butt)</h4>
+                    <div class="param-group">
+                        <div class="param-item">
+                            <label>角度范围:</label>
+                            <input type="number" id="butt-min-angle" value="150" min="0" max="180">
+                            <span>-</span>
+                            <input type="number" id="butt-max-angle" value="180" min="0" max="180">
+                            <span>°</span>
+                        </div>
+                    </div>
+
+                    <button class="btn-primary" onclick="updateParameters()">更新参数</button>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="card">
+                    <button class="btn-analyze" id="analyzeBtn" disabled>
+                        🔍 开始分析
+                    </button>
+                </div>
+            </div>
+
+            <!-- 中间3D视图区 -->
+            <div class="center-panel">
+                <div class="card viewer-card">
+                    <div class="viewer-header">
+                        <h3>📊 3D视图</h3>
+                        <div class="viewer-controls">
+                            <button onclick="resetView()">重置视角</button>
+                            <button onclick="toggleWireframe()">线框模式</button>
+                            <button onclick="toggleGrid()">显示/隐藏网格</button>
+                            <button onclick="toggleAxes()">显示/隐藏坐标轴</button>
+                            <button onclick="switchAxisMode()" title="切换坐标轴方向并重置视图&#10;XYZ → XZY → YXZ → YZX → ZXY → ZYX&#10;同时调整网格平面方向">切换轴向</button>
+                            <button onclick="openFullscreen()" class="btn-fullscreen" title="在新窗口打开全屏3D视图">
+                                🖥️ 全屏视图
+                            </button>
+                        </div>
+                    </div>
+                    <div id="threejs-viewer" class="viewer-container">
+                        <div class="viewer-placeholder">
+                            <p>3D模型将在这里显示</p>
+                            <p class="hint">上传STEP文件后自动加载</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧结果面板 -->
+            <div class="right-panel">
+                <!-- 分析结果 -->
+                <div class="card">
+                    <h3>📈 分析结果</h3>
+                    <div id="results" class="results-container">
+                        <div class="no-results">
+                            <p>暂无分析结果</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 导出选项 -->
+                <div class="card">
+                    <h3>💾 导出选项</h3>
+                    <div class="export-buttons">
+                        <button class="btn-export" disabled id="exportJsonBtn">
+                            导出 JSON
+                        </button>
+                        <button class="btn-export" disabled id="exportCsvBtn">
+                            导出 CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 状态栏 -->
+        <footer>
+            <div class="status-bar">
+                <span id="status">就绪</span>
+                <span id="progress" style="display: none;">
+                    <span class="spinner"></span>
+                    <span>处理中...</span>
+                </span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 加载Three.js r180 (ES模块方式) -->
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <!-- 主应用模块 -->
+    <script type="module" src="static/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全屏3D视图 - 焊缝特征提取研发平台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            overflow: hidden;
+            background: #1a1a1a;
+        }
+
+        #viewer-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* 控制面板 */
+        .control-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            min-width: 200px;
+            max-width: 300px;
+            z-index: 1000;
+        }
+
+        .control-panel h3 {
+            margin: 0 0 15px 0;
+            font-size: 16px;
+            color: #333;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .control-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-button {
+            padding: 8px 12px;
+            background: #f0f0f0;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+            color: #333;
+        }
+
+        .control-button:hover {
+            background: #e0e0e0;
+            transform: translateX(2px);
+        }
+
+        .control-button:active {
+            transform: translateX(0);
+        }
+
+        .control-button.active {
+            background: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+        }
+
+        /* 信息面板 */
+        .info-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+            max-width: 300px;
+        }
+
+        .info-row {
+            margin-bottom: 5px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .info-label {
+            color: #aaa;
+        }
+
+        .info-value {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        /* 返回按钮 */
+        .back-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            z-index: 1001;
+        }
+
+        .back-button:hover {
+            background: white;
+            transform: translateX(-2px);
+        }
+
+        /* 坐标轴指示器 */
+        .axis-indicator {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 120px;
+            height: 120px;
+            z-index: 999;
+        }
+
+        /* 加载动画 */
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+        }
+
+        .spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top: 3px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 工具提示 */
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            display: none;
+            z-index: 2000;
+        }
+
+        /* 快捷键提示 */
+        .shortcuts {
+            position: absolute;
+            bottom: 20px;
+            right: 350px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            color: white;
+        }
+
+        .shortcut-item {
+            margin-bottom: 5px;
+        }
+
+        .shortcut-key {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="viewer-container"></div>
+
+    <!-- 返回按钮 -->
+    <button class="back-button" onclick="goBack()">
+        ← 返回主界面
+    </button>
+
+    <!-- 控制面板 -->
+    <div class="control-panel">
+        <h3>🎮 视图控制</h3>
+
+        <div class="control-group">
+            <div class="control-label">显示选项</div>
+            <div class="control-buttons">
+                <button class="control-button" id="btnWireframe" onclick="toggleWireframe()">
+                    线框模式
+                </button>
+                <button class="control-button active" id="btnGrid" onclick="toggleGrid()">
+                    显示网格
+                </button>
+                <button class="control-button active" id="btnAxes" onclick="toggleAxes()">
+                    显示坐标轴
+                </button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">视角控制</div>
+            <div class="control-buttons">
+                <button class="control-button" onclick="resetView()">
+                    重置视角
+                </button>
+                <button class="control-button" onclick="viewFront()">
+                    前视图
+                </button>
+                <button class="control-button" onclick="viewTop()">
+                    顶视图
+                </button>
+                <button class="control-button" onclick="viewSide()">
+                    侧视图
+                </button>
+            </div>
+        </div>
+
+        <div class="control-group">
+            <div class="control-label">坐标系</div>
+            <div class="control-buttons">
+                <button class="control-button" onclick="switchAxisMode()">
+                    切换轴向 <span id="axisMode">XYZ</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 信息面板 -->
+    <div class="info-panel" id="infoPanel">
+        <div class="info-row">
+            <span class="info-label">模型:</span>
+            <span class="info-value" id="modelName">未加载</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">顶点数:</span>
+            <span class="info-value" id="vertexCount">0</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">三角形数:</span>
+            <span class="info-value" id="faceCount">0</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">焊缝数:</span>
+            <span class="info-value" id="weldCount">0</span>
+        </div>
+    </div>
+
+    <!-- 快捷键提示 -->
+    <div class="shortcuts">
+        <div class="shortcut-item">
+            <span class="shortcut-key">左键拖动</span> 旋转
+        </div>
+        <div class="shortcut-item">
+            <span class="shortcut-key">右键拖动</span> 平移
+        </div>
+        <div class="shortcut-item">
+            <span class="shortcut-key">滚轮</span> 缩放
+        </div>
+        <div class="shortcut-item">
+            <span class="shortcut-key">W</span> 线框切换
+        </div>
+        <div class="shortcut-item">
+            <span class="shortcut-key">G</span> 网格切换
+        </div>
+        <div class="shortcut-item">
+            <span class="shortcut-key">A</span> 坐标轴切换
+        </div>
+        <div class="shortcut-item">
+            <span class="shortcut-key">R</span> 重置视角
+        </div>
+    </div>
+
+    <!-- 加载提示 -->
+    <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>加载3D模型中...</p>
+    </div>
+
+    <!-- 工具提示 -->
+    <div class="tooltip" id="tooltip"></div>
+
+    <!-- 坐标轴指示器 -->
+    <div class="axis-indicator" id="axisIndicator"></div>
+
+    <!-- 加载Three.js -->
+    <script async src="https://unpkg.com/es-module-shims@1.6.3/dist/es-module-shims.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <!-- 主应用脚本 -->
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        let scene, camera, renderer, controls;
+        let currentModel = null;
+        let isWireframe = false;
+        let isGridVisible = true;
+        let isAxesVisible = true;
+        let axisMode = 0;
+
+        // 初始化Three.js
+        function init() {
+            const container = document.getElementById('viewer-container');
+
+            // 创建场景
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x2a2a2a);
+
+            // 创建相机 - Z轴朝上配置
+            camera = new THREE.PerspectiveCamera(
+                45,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                10000
+            );
+            camera.position.set(150, 150, 150);
+            camera.up.set(0, 0, 1); // 设置Z轴为上方向
+
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // 创建控制器
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = true;
+            controls.minDistance = 10;
+            controls.maxDistance = 1000;
+
+            // 添加光源
+            setupLights();
+
+            // 添加辅助对象
+            setupHelpers();
+
+            // 加载模型数据
+            loadModelData();
+
+            // 开始渲染循环
+            animate();
+
+            // 设置事件监听
+            setupEventListeners();
+
+            // 隐藏加载动画
+            setTimeout(() => {
+                document.getElementById('loading').style.display = 'none';
+            }, 1000);
+        }
+
+        // 设置光源
+        function setupLights() {
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(100, 100, 50);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+
+            const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.3);
+            scene.add(hemisphereLight);
+        }
+
+        // 设置辅助对象
+        function setupHelpers() {
+            // 网格 - 在XY平面（Z=0）
+            const gridHelper = new THREE.GridHelper(200, 20, 0x888888, 0x444444);
+            gridHelper.rotateX(Math.PI / 2); // 旋转到XY平面
+            gridHelper.name = 'gridHelper';
+            scene.add(gridHelper);
+
+            // 坐标轴
+            const axesHelper = new THREE.AxesHelper(50);
+            axesHelper.name = 'axesHelper';
+            scene.add(axesHelper);
+        }
+
+        // 根据模型大小更新辅助对象
+        function updateHelpers(model) {
+            if (!model) return;
+
+            const box = new THREE.Box3().setFromObject(model);
+            const size = box.getSize(new THREE.Vector3());
+            const center = box.getCenter(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+
+            // 移除旧的辅助对象
+            const oldGrid = scene.getObjectByName('gridHelper');
+            const oldAxes = scene.getObjectByName('axesHelper');
+
+            if (oldGrid) {
+                scene.remove(oldGrid);
+                oldGrid.geometry?.dispose();
+            }
+            if (oldAxes) {
+                scene.remove(oldAxes);
+                oldAxes.geometry?.dispose();
+            }
+
+            // 创建新的网格 - 大小根据模型调整
+            const gridSize = Math.max(maxDim * 2, 100);
+            const gridDivisions = Math.max(20, Math.floor(gridSize / 10));
+            const newGrid = new THREE.GridHelper(gridSize, gridDivisions, 0x888888, 0x444444);
+            newGrid.rotateX(Math.PI / 2); // 旋转到XY平面
+            newGrid.name = 'gridHelper';
+            newGrid.position.copy(center);
+            newGrid.position.z = box.min.z - 1; // 放在模型底部
+            newGrid.visible = isGridVisible;
+            scene.add(newGrid);
+
+            // 创建新的坐标轴 - 大小根据模型调整
+            const axesSize = Math.max(maxDim * 0.5, 25);
+            const newAxes = new THREE.AxesHelper(axesSize);
+            newAxes.name = 'axesHelper';
+            newAxes.position.copy(center);
+            newAxes.visible = isAxesVisible;
+            scene.add(newAxes);
+        }
+
+        // 加载模型数据
+        function loadModelData() {
+            // 从localStorage或sessionStorage获取模型数据
+            const modelData = sessionStorage.getItem('modelData');
+
+            if (modelData) {
+                const data = JSON.parse(modelData);
+                displayModel(data);
+                updateInfo(data);
+            }
+        }
+
+        // 显示模型
+        function displayModel(data) {
+            if (!data.mesh) return;
+
+            // 创建几何体
+            const geometry = new THREE.BufferGeometry();
+
+            // 设置顶点
+            const vertices = new Float32Array(data.mesh.vertices);
+            geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+
+            // 设置面
+            if (data.mesh.faces) {
+                const indices = new Uint32Array(data.mesh.faces);
+                geometry.setIndex(new THREE.BufferAttribute(indices, 1));
+            }
+
+            // 计算法向量
+            geometry.computeVertexNormals();
+            geometry.computeBoundingBox();
+            geometry.computeBoundingSphere();
+
+            // 创建材质
+            const material = new THREE.MeshPhongMaterial({
+                color: 0x8888cc,
+                specular: 0x222222,
+                shininess: 100,
+                side: THREE.DoubleSide,
+                wireframe: false
+            });
+
+            // 创建网格
+            currentModel = new THREE.Mesh(geometry, material);
+            currentModel.castShadow = true;
+            currentModel.receiveShadow = true;
+            scene.add(currentModel);
+
+            // 调整相机和辅助对象
+            fitCameraToObject(currentModel);
+            updateHelpers(currentModel);
+        }
+
+        // 调整相机视角
+        function fitCameraToObject(object) {
+            const box = new THREE.Box3().setFromObject(object);
+            const size = box.getSize(new THREE.Vector3());
+            const center = box.getCenter(new THREE.Vector3());
+
+            const maxDim = Math.max(size.x, size.y, size.z);
+
+            // 如果模型太大或太小，进行缩放
+            let scale = 1;
+            const targetSize = 100; // 目标尺寸
+
+            if (maxDim > targetSize * 5) {
+                // 模型太大，缩小
+                scale = targetSize / maxDim;
+            } else if (maxDim < targetSize * 0.1) {
+                // 模型太小，放大
+                scale = targetSize / maxDim;
+            }
+
+            // 应用缩放
+            if (scale !== 1) {
+                object.scale.setScalar(scale);
+                console.log('模型缩放比例:', scale);
+
+                // 重新计算包围盒
+                box.setFromObject(object);
+                size.copy(box.getSize(new THREE.Vector3()));
+                center.copy(box.getCenter(new THREE.Vector3()));
+            }
+
+            // 将模型移动到原点
+            object.position.set(-center.x, -center.y, -center.z);
+
+            // 重新计算最终位置的包围盒
+            box.setFromObject(object);
+            const finalSize = box.getSize(new THREE.Vector3());
+            const finalCenter = box.getCenter(new THREE.Vector3());
+            const finalMaxDim = Math.max(finalSize.x, finalSize.y, finalSize.z);
+
+            // 计算合适的相机距离
+            const fov = camera.fov * (Math.PI / 180);
+            const distance = finalMaxDim / (2 * Math.tan(fov / 2)) * 1.5;
+
+            camera.position.set(
+                finalCenter.x + distance * 0.7,
+                finalCenter.y + distance * 0.7,
+                finalCenter.z + distance * 0.7
+            );
+            camera.up.set(0, 0, 1);
+            camera.lookAt(finalCenter);
+
+            controls.target.copy(finalCenter);
+            controls.maxDistance = distance * 5;
+            controls.minDistance = finalMaxDim * 0.1;
+            controls.update();
+        }
+
+        // 更新信息面板
+        function updateInfo(data) {
+            document.getElementById('modelName').textContent = data.filename || '未命名';
+            document.getElementById('vertexCount').textContent =
+                data.mesh ? (data.mesh.vertices.length / 3).toLocaleString() : '0';
+            document.getElementById('faceCount').textContent =
+                data.mesh ? (data.mesh.faces.length / 3).toLocaleString() : '0';
+            document.getElementById('weldCount').textContent =
+                data.welds ? data.welds.length : '0';
+        }
+
+        // 动画循环
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // 设置事件监听
+        function setupEventListeners() {
+            // 窗口调整
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            // 键盘快捷键
+            document.addEventListener('keydown', (e) => {
+                switch(e.key.toLowerCase()) {
+                    case 'w':
+                        window.toggleWireframe();
+                        break;
+                    case 'g':
+                        window.toggleGrid();
+                        break;
+                    case 'a':
+                        window.toggleAxes();
+                        break;
+                    case 'r':
+                        window.resetView();
+                        break;
+                }
+            });
+        }
+
+        // 全局函数
+        window.toggleWireframe = () => {
+            isWireframe = !isWireframe;
+            if (currentModel) {
+                currentModel.material.wireframe = isWireframe;
+            }
+            document.getElementById('btnWireframe').classList.toggle('active', isWireframe);
+        };
+
+        window.toggleGrid = () => {
+            isGridVisible = !isGridVisible;
+            const grid = scene.getObjectByName('gridHelper');
+            if (grid) grid.visible = isGridVisible;
+            document.getElementById('btnGrid').classList.toggle('active', isGridVisible);
+        };
+
+        window.toggleAxes = () => {
+            isAxesVisible = !isAxesVisible;
+            const axes = scene.getObjectByName('axesHelper');
+            if (axes) axes.visible = isAxesVisible;
+            document.getElementById('btnAxes').classList.toggle('active', isAxesVisible);
+        };
+
+        window.resetView = () => {
+            if (currentModel) {
+                fitCameraToObject(currentModel);
+            } else {
+                camera.position.set(150, 150, 150);
+                camera.up.set(0, 0, 1); // 确保Z轴朝上
+                camera.lookAt(0, 0, 0);
+                controls.target.set(0, 0, 0);
+                controls.update();
+            }
+        };
+
+        window.viewFront = () => {
+            const center = controls.target.clone();
+            const distance = camera.position.distanceTo(center);
+            camera.position.set(center.x, center.y - distance, center.z);
+            camera.up.set(0, 0, 1);
+            camera.lookAt(center);
+            controls.update();
+        };
+
+        window.viewTop = () => {
+            const center = controls.target.clone();
+            const distance = camera.position.distanceTo(center);
+            camera.position.set(center.x, center.y, center.z + distance);
+            camera.up.set(0, 1, 0); // 顶视图时Y轴向前
+            camera.lookAt(center);
+            controls.update();
+        };
+
+        window.viewSide = () => {
+            const center = controls.target.clone();
+            const distance = camera.position.distanceTo(center);
+            camera.position.set(center.x + distance, center.y, center.z);
+            camera.up.set(0, 0, 1);
+            camera.lookAt(center);
+            controls.update();
+        };
+
+        window.switchAxisMode = () => {
+            // Z轴朝上模式下，简化为只切换视角
+            console.log('切换视角模式');
+            window.resetView();
+        };
+
+        window.goBack = () => {
+            window.close();
+            // 如果无法关闭窗口，返回上一页
+            if (!window.closed) {
+                window.location.href = '/';
+            }
+        };
+
+        // 初始化
+        init();
+    </script>
+</body>
+</html>

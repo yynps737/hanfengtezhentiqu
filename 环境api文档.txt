@@ -1,0 +1,213 @@
+================================================================================
+                        焊缝特征提取研发平台 - 环境API文档
+================================================================================
+
+本文档包含项目所有依赖库的官方文档和仓库地址，便于开发时查询API和解决问题。
+
+================================================================================
+1. PythonOCC-Core
+================================================================================
+描述：OpenCASCADE的Python绑定，提供完整的CAD几何内核功能
+版本：最新版（conda-forge）
+
+官方仓库：https://github.com/tpaviot/pythonocc-core
+官方文档：https://github.com/tpaviot/pythonocc-core/wiki
+API文档：http://pythonocc.readthedocs.io/
+示例代码：https://github.com/tpaviot/pythonocc-demos
+论坛社区：https://groups.google.com/g/pythonocc
+
+核心模块：
+- OCC.Core.BRepPrimAPI - 基本形状创建
+- OCC.Core.TopExp - 拓扑探索
+- OCC.Core.BRep - 边界表示
+- OCC.Core.gp - 几何基础类
+- OCC.Core.STEPControl - STEP文件读写
+
+================================================================================
+2. Flask
+================================================================================
+描述：轻量级Python Web框架
+版本：3.0.0
+
+官方网站：https://flask.palletsprojects.com/
+官方仓库：https://github.com/pallets/flask
+中文文档：https://dormousehole.readthedocs.io/
+API文档：https://flask.palletsprojects.com/en/3.0.x/api/
+快速入门：https://flask.palletsprojects.com/en/3.0.x/quickstart/
+
+常用模块：
+- flask.Flask - 应用主类
+- flask.request - 请求对象
+- flask.jsonify - JSON响应
+- flask.send_file - 文件发送
+- flask.Blueprint - 蓝图模块
+
+================================================================================
+3. Flask-CORS
+================================================================================
+描述：Flask跨域资源共享（CORS）扩展
+版本：4.0.0
+
+官方仓库：https://github.com/corydolphin/flask-cors
+官方文档：https://flask-cors.readthedocs.io/
+PyPI页面：https://pypi.org/project/Flask-Cors/
+
+使用示例：
+from flask_cors import CORS
+CORS(app)  # 允许所有域的跨域请求
+
+================================================================================
+4. NumPy
+================================================================================
+描述：Python科学计算基础库
+版本：1.24.3
+
+官方网站：https://numpy.org/
+官方文档：https://numpy.org/doc/1.24/
+API参考：https://numpy.org/doc/1.24/reference/
+官方仓库：https://github.com/numpy/numpy
+教程指南：https://numpy.org/doc/1.24/user/absolute_beginners.html
+中文文档：https://www.numpy.org.cn/
+
+常用功能：
+- numpy.array - 数组创建
+- numpy.linalg - 线性代数
+- numpy.dot - 矩阵运算
+- numpy.cross - 叉积计算
+
+================================================================================
+5. Werkzeug
+================================================================================
+描述：WSGI Web应用库，Flask的底层依赖
+版本：3.0.1
+
+官方网站：https://werkzeug.palletsprojects.com/
+官方仓库：https://github.com/pallets/werkzeug
+官方文档：https://werkzeug.palletsprojects.com/en/3.0.x/
+API文档：https://werkzeug.palletsprojects.com/en/3.0.x/api/
+
+常用模块：
+- werkzeug.utils - 工具函数
+- werkzeug.security - 安全相关
+- werkzeug.exceptions - HTTP异常
+
+================================================================================
+6. Python 3.11
+================================================================================
+描述：Python编程语言
+版本：3.11
+
+官方网站：https://www.python.org/
+官方文档：https://docs.python.org/3.11/
+标准库文档：https://docs.python.org/3.11/library/
+语言参考：https://docs.python.org/3.11/reference/
+教程：https://docs.python.org/3.11/tutorial/
+
+================================================================================
+                              OpenCASCADE相关资源
+================================================================================
+
+OpenCASCADE Technology（OCCT）文档：
+官方网站：https://www.opencascade.com/
+官方文档：https://dev.opencascade.org/doc/overview/html/
+API参考：https://dev.opencascade.org/doc/refman/html/
+教程指南：https://dev.opencascade.org/doc/overview/html/occt_user_guides.html
+
+OCCT几何内核核心概念：
+- BRep（边界表示）：https://dev.opencascade.org/doc/overview/html/occt_user_guides__brep.html
+- 拓扑和几何：https://dev.opencascade.org/doc/overview/html/occt_user_guides__topology.html
+- STEP格式：https://dev.opencascade.org/doc/overview/html/occt_user_guides__step.html
+
+================================================================================
+                              常见问题解决资源
+================================================================================
+
+Stack Overflow标签：
+- PythonOCC：https://stackoverflow.com/questions/tagged/pythonocc
+- OpenCASCADE：https://stackoverflow.com/questions/tagged/opencascade
+- Flask：https://stackoverflow.com/questions/tagged/flask
+
+GitHub Issues：
+- PythonOCC Issues：https://github.com/tpaviot/pythonocc-core/issues
+- Flask Issues：https://github.com/pallets/flask/issues
+
+社区论坛：
+- PythonOCC Google Group：https://groups.google.com/g/pythonocc
+- Flask Discord：https://discord.gg/pallets
+
+================================================================================
+                              焊缝检测相关算法参考
+================================================================================
+
+1. 拓扑分析算法
+   - TopExp::MapShapesAndAncestors - 构建形状关系映射
+   - TopExp_Explorer - 遍历拓扑结构
+   - TopTools_IndexedDataMapOfShapeListOfShape - 形状映射数据结构
+
+2. 几何计算
+   - BRepAdaptor_Surface - 表面适配器
+   - GeomLProp_SLProps - 表面属性计算
+   - gp_Vec - 向量运算
+   - gp_Dir - 方向计算
+
+3. 边缘分析
+   - BRepAdaptor_Curve - 曲线适配器
+   - GCPnts_AbscissaPoint - 曲线长度计算
+   - BRep_Tool - BRep工具类
+
+================================================================================
+                              快速命令参考
+================================================================================
+
+# 创建环境
+conda env create -f environment.yml
+
+# 激活环境
+conda activate weld_research
+
+# 更新包
+conda update pythonocc-core
+pip install --upgrade flask
+
+# 查看已安装包
+conda list
+pip list
+
+# 导出当前环境
+conda env export > environment_backup.yml
+
+# 删除环境（如需重建）
+conda deactivate
+conda env remove -n weld_research
+
+================================================================================
+                              开发调试技巧
+================================================================================
+
+1. PythonOCC调试
+   - 使用 BRepTools.Write() 导出中间结果为BREP文件
+   - 使用 Display3d 可视化几何体
+   - 打印拓扑结构：TopExp_Explorer遍历
+
+2. Flask调试
+   - 设置 app.debug = True 开启调试模式
+   - 使用 app.logger 记录日志
+   - 使用 Flask-DebugToolbar 扩展
+
+3. 性能优化
+   - 使用 NumPy 向量化计算替代循环
+   - 缓存重复的几何计算结果
+   - 使用 Flask 的 @cache 装饰器
+
+================================================================================
+                              版本兼容性说明
+================================================================================
+
+重要：PythonOCC-core 目前支持 Python 3.7 - 3.12
+      不支持 Python 3.13+
+
+建议版本组合：
+- Python 3.11 + PythonOCC 7.8.1 + Flask 3.0.0 （当前配置）
+- Python 3.10 + PythonOCC 7.7.0 + Flask 2.3.3 （稳定版本）
+
+================================================================================
