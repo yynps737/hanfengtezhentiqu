@@ -112,8 +112,9 @@ class GeometryCalculator:
             )
 
             if props.IsNormalDefined():
+                # Normal()返回的已经是gp_Dir
                 normal = props.Normal()
-                return gp_Dir(normal)
+                return normal
             else:
                 return None
 
@@ -147,11 +148,13 @@ class GeometryCalculator:
         Returns:
             bool: 是否为直线
         """
+        from OCC.Core.GeomAbs import GeomAbs_Line
+
         curve = BRepAdaptor_Curve(edge)
         curve_type = curve.GetType()
 
-        # GeomAbs_Line = 1
-        return curve_type == 1
+        # 使用正确的枚举值
+        return curve_type == GeomAbs_Line
 
     @staticmethod
     def is_planar_face(face):
@@ -164,11 +167,13 @@ class GeometryCalculator:
         Returns:
             bool: 是否为平面
         """
+        from OCC.Core.GeomAbs import GeomAbs_Plane
+
         surface = BRepAdaptor_Surface(face)
         surface_type = surface.GetType()
 
-        # GeomAbs_Plane = 1
-        return surface_type == 1
+        # 使用正确的枚举值
+        return surface_type == GeomAbs_Plane
 
     @staticmethod
     def get_edge_midpoint(edge):

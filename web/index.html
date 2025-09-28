@@ -43,32 +43,37 @@
 
                 <!-- 检测参数设置 -->
                 <div class="card">
-                    <h3>⚙️ 检测参数设置</h3>
+                    <h3>⚙️ 角接头检测参数</h3>
 
-                    <h4>角焊缝 (Fillet)</h4>
+                    <h4>几何约束</h4>
                     <div class="param-group">
                         <div class="param-item">
-                            <label>角度范围:</label>
-                            <input type="number" id="fillet-min-angle" value="60" min="0" max="180">
+                            <label>接头角度范围:</label>
+                            <input type="number" id="min-angle" value="70" min="0" max="180">
                             <span>-</span>
-                            <input type="number" id="fillet-max-angle" value="120" min="0" max="180">
+                            <input type="number" id="max-angle" value="110" min="0" max="180">
                             <span>°</span>
                         </div>
                         <div class="param-item">
-                            <label>最小长度:</label>
-                            <input type="number" id="fillet-min-length" value="5" min="0" step="0.1">
-                            <span>mm</span>
+                            <label>最优角度:</label>
+                            <input type="number" id="optimal-angle" value="90" min="0" max="180">
+                            <span>°</span>
                         </div>
                     </div>
 
-                    <h4>对接焊缝 (Butt)</h4>
+                    <h4>尺寸约束</h4>
                     <div class="param-group">
                         <div class="param-item">
-                            <label>角度范围:</label>
-                            <input type="number" id="butt-min-angle" value="150" min="0" max="180">
+                            <label>最小接头长度:</label>
+                            <input type="number" id="min-joint-length" value="10" min="0" step="0.1">
+                            <span>mm</span>
+                        </div>
+                        <div class="param-item">
+                            <label>板厚范围:</label>
+                            <input type="number" id="min-plate-thickness" value="1" min="0" step="0.1">
                             <span>-</span>
-                            <input type="number" id="butt-max-angle" value="180" min="0" max="180">
-                            <span>°</span>
+                            <input type="number" id="max-plate-thickness" value="50" min="0" step="0.1">
+                            <span>mm</span>
                         </div>
                     </div>
 
@@ -120,15 +125,55 @@
                     </div>
                 </div>
 
+                <!-- 边特征深度分析 -->
+                <div class="card">
+                    <h3>🔍 边特征深度分析</h3>
+
+                    <div class="edge-analysis-controls">
+                        <button class="btn-primary" id="toggleEdgeMode" onclick="toggleEdgeSelectionMode()">
+                            进入边选择模式
+                        </button>
+
+                        <div id="edgeSelectionInfo" style="display: none;">
+                            <p class="hint">点击3D模型中的边进行选择</p>
+                            <div id="selectedEdgesList" class="edge-list">
+                                <!-- 选中的边列表将显示在这里 -->
+                            </div>
+
+                            <div class="edge-actions">
+                                <button class="btn-analyze" onclick="analyzeSelectedEdges()">
+                                    分析选中的边
+                                </button>
+                                <button class="btn-small" onclick="clearSelectedEdges()">
+                                    清除选择
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="edgeAnalysisResults" class="edge-results" style="display: none;">
+                        <!-- 边分析结果将显示在这里 -->
+                    </div>
+                </div>
+
                 <!-- 导出选项 -->
                 <div class="card">
                     <h3>💾 导出选项</h3>
                     <div class="export-buttons">
                         <button class="btn-export" disabled id="exportJsonBtn">
-                            导出 JSON
+                            导出焊缝 JSON
                         </button>
                         <button class="btn-export" disabled id="exportCsvBtn">
-                            导出 CSV
+                            导出焊缝 CSV
+                        </button>
+                    </div>
+
+                    <div class="export-buttons" style="margin-top: 10px;">
+                        <button class="btn-export" disabled id="exportEdgeJsonBtn" onclick="exportEdgeAnalysis('json')">
+                            导出边分析 JSON
+                        </button>
+                        <button class="btn-export" disabled id="exportEdgeTxtBtn" onclick="exportEdgeAnalysis('txt')">
+                            导出边分析 TXT
                         </button>
                     </div>
                 </div>

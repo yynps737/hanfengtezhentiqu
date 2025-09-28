@@ -6,12 +6,14 @@
 import { ThreeRenderer } from './three-renderer.js';
 import { ApiClient } from './api-client.js';
 import { UiManager } from './ui-manager.js';
+import { EdgeSelector } from './edge-selector.js';
 
 class WeldDetectionApp {
     constructor() {
         this.renderer = null;
         this.apiClient = null;
         this.uiManager = null;
+        this.edgeSelector = null;
     }
 
     async init() {
@@ -32,6 +34,9 @@ class WeldDetectionApp {
             } else {
                 throw new Error('无法找到3D视图容器');
             }
+
+            // 初始化边选择器（需要渲染器引用）
+            this.edgeSelector = new EdgeSelector(this.apiClient, this.renderer);
 
             // 设置事件监听
             this.setupEventListeners();
@@ -87,6 +92,12 @@ class WeldDetectionApp {
         window.toggleAxes = () => this.toggleAxes();
         window.switchAxisMode = () => this.switchAxisMode();
         window.openFullscreen = () => this.openFullscreen();
+
+        // 边选择相关函数
+        window.toggleEdgeSelectionMode = () => this.toggleEdgeSelectionMode();
+        window.analyzeSelectedEdges = () => this.analyzeSelectedEdges();
+        window.clearSelectedEdges = () => this.clearSelectedEdges();
+        window.exportEdgeAnalysis = (format) => this.exportEdgeAnalysis(format);
     }
 
     async handleFileUpload(file) {
@@ -124,6 +135,11 @@ class WeldDetectionApp {
             const parameters = this.uiManager.getParameters();
             const result = await this.apiClient.analyzeModel(parameters);
 
+            // 验证响应数据
+            if (!result || !result.summary) {
+                throw new Error('服务器返回的数据格式错误');
+            }
+
             this.uiManager.displayResults(result);
 
             // 在3D视图中高亮焊缝
@@ -132,7 +148,7 @@ class WeldDetectionApp {
             }
 
             this.uiManager.showMessage(
-                `分析完成: 找到 ${result.summary.total} 条焊缝`,
+                `分析完成: 找到 ${result.summary.total || 0} 条焊缝`,
                 'success'
             );
 
@@ -181,10 +197,9 @@ class WeldDetectionApp {
         this.uiManager.clearFileInfo();
         this.uiManager.setAnalyzeButtonEnabled(false);
 
-        // 清空3D视图的模型
-        if (this.renderer && this.renderer.currentModel) {
-            this.renderer.scene.remove(this.renderer.currentModel);
-            this.renderer.currentModel = null;
+        // 清空3D视图的模型和所有分析结果
+        if (this.renderer) {
+            this.renderer.clearAll();
         }
 
         this.uiManager.showMessage('文件已清除', 'info');
@@ -263,6 +278,33 @@ class WeldDetectionApp {
         if (!fullscreenWindow || fullscreenWindow.closed) {
             window.location.href = '/fullscreen.html';
         }
+    }
+
+    // 边选择相关方法
+    toggleEdgeSelectionMode() {
+        if (!this.apiClient.hasCurrentFile()) {
+            this.uiManager.showMessage('请先上传STEP文件', 'error');
+            return;
+        }
+
+        const isActive = this.edgeSelector.toggleSelectionMode();
+        this.uiManager.showMessage(
+            isActive ? '边选择模式已开启' : '边选择模式已关闭',
+            'info'
+        );
+    }
+
+    async analyzeSelectedEdges() {
+        await this.edgeSelector.analyzeSelectedEdges();
+    }
+
+    clearSelectedEdges() {
+        this.edgeSelector.clearSelection();
+        this.uiManager.showMessage('已清除边选择', 'info');
+    }
+
+    async exportEdgeAnalysis(format) {
+        await this.edgeSelector.exportAnalysis(format);
     }
 }
 

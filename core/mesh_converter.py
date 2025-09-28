@@ -6,9 +6,11 @@
 from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
 from OCC.Core.BRep import BRep_Tool
 from OCC.Core.TopExp import TopExp_Explorer
-from OCC.Core.TopAbs import TopAbs_FACE
+from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_EDGE
 from OCC.Core.TopLoc import TopLoc_Location
 from OCC.Core.TopoDS import topods
+from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
+from OCC.Core.GCPnts import GCPnts_UniformDeflection
 import json
 
 
@@ -83,12 +85,58 @@ class MeshConverter:
 
             explorer.Next()
 
+        # 提取边的线段数据（用于选择高亮）
+        edges_data = MeshConverter.extract_edges(shape)
+
         print(f"网格生成完成: {len(vertices)//3} 个顶点, {len(faces)//3} 个三角形")
 
         return {
             'vertices': vertices,
-            'faces': faces
+            'faces': faces,
+            'edges': edges_data
         }
+
+    @staticmethod
+    def extract_edges(shape):
+        """
+        提取边的线段数据用于3D显示和选择
+
+        Args:
+            shape: TopoDS_Shape对象
+
+        Returns:
+            edges_data: 边的线段数据列表
+        """
+        edges_data = []
+        edge_idx = 0
+
+        # 遍历所有边
+        explorer = TopExp_Explorer(shape, TopAbs_EDGE)
+        while explorer.More():
+            edge = topods.Edge(explorer.Current())
+
+            # 获取边的曲线
+            curve = BRepAdaptor_Curve(edge)
+
+            # 采样边上的点（用于绘制）
+            points = []
+            num_samples = 20  # 每条边采样20个点
+
+            for i in range(num_samples):
+                t = curve.FirstParameter() + \
+                    (curve.LastParameter() - curve.FirstParameter()) * i / (num_samples - 1)
+                pnt = curve.Value(t)
+                points.extend([pnt.X(), pnt.Y(), pnt.Z()])
+
+            edges_data.append({
+                'id': f'EDGE_{edge_idx}',
+                'points': points  # 用于绘制边的点序列
+            })
+
+            edge_idx += 1
+            explorer.Next()
+
+        return edges_data
 
     @staticmethod
     def shape_to_json(shape):

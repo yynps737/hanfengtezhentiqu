@@ -76,8 +76,13 @@ export class ApiClient {
 
             const data = await response.json();
 
-            if (!data.success) {
-                throw new Error(data.error || '分析失败');
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            // 如果成功但没有summary，提供默认值
+            if (!data.summary) {
+                data.summary = { total: 0, by_type: {} };
             }
 
             return data;
@@ -101,15 +106,12 @@ export class ApiClient {
         } catch (error) {
             console.error('获取参数失败:', error);
             return {
-                fillet: {
-                    min_angle: 60,
-                    max_angle: 120,
-                    min_length: 5
-                },
-                butt: {
-                    min_angle: 150,
-                    max_angle: 180
-                }
+                min_angle: 70,
+                max_angle: 110,
+                min_joint_length: 10,
+                optimal_angle: 90,
+                min_plate_thickness: 1,
+                max_plate_thickness: 50
             };
         }
     }

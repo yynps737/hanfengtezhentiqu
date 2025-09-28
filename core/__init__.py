@@ -4,12 +4,12 @@
 
 from .step_loader import StepLoader
 from .topology_analyzer import TopologyAnalyzer
-from .weld_detector import WeldDetector
 from .geometry_calculator import GeometryCalculator
+from .mesh_converter import MeshConverter
 
 __all__ = [
     'StepLoader',
     'TopologyAnalyzer',
-    'WeldDetector',
-    'GeometryCalculator'
+    'GeometryCalculator',
+    'MeshConverter'
 ]

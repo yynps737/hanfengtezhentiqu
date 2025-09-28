@@ -76,29 +76,22 @@ export class UiManager {
 
     getParameters() {
         return {
-            fillet: {
-                min_angle: parseFloat(document.getElementById('fillet-min-angle').value),
-                max_angle: parseFloat(document.getElementById('fillet-max-angle').value),
-                min_length: parseFloat(document.getElementById('fillet-min-length').value)
-            },
-            butt: {
-                min_angle: parseFloat(document.getElementById('butt-min-angle').value),
-                max_angle: parseFloat(document.getElementById('butt-max-angle').value)
-            }
+            min_angle: parseFloat(document.getElementById('min-angle').value),
+            max_angle: parseFloat(document.getElementById('max-angle').value),
+            optimal_angle: parseFloat(document.getElementById('optimal-angle').value),
+            min_joint_length: parseFloat(document.getElementById('min-joint-length').value),
+            min_plate_thickness: parseFloat(document.getElementById('min-plate-thickness').value),
+            max_plate_thickness: parseFloat(document.getElementById('max-plate-thickness').value)
         };
     }
 
     setParameters(params) {
-        if (params.fillet) {
-            document.getElementById('fillet-min-angle').value = params.fillet.min_angle || 60;
-            document.getElementById('fillet-max-angle').value = params.fillet.max_angle || 120;
-            document.getElementById('fillet-min-length').value = params.fillet.min_length || 5;
-        }
-
-        if (params.butt) {
-            document.getElementById('butt-min-angle').value = params.butt.min_angle || 150;
-            document.getElementById('butt-max-angle').value = params.butt.max_angle || 180;
-        }
+        document.getElementById('min-angle').value = params.min_angle || 70;
+        document.getElementById('max-angle').value = params.max_angle || 110;
+        document.getElementById('optimal-angle').value = params.optimal_angle || 90;
+        document.getElementById('min-joint-length').value = params.min_joint_length || 10;
+        document.getElementById('min-plate-thickness').value = params.min_plate_thickness || 1;
+        document.getElementById('max-plate-thickness').value = params.max_plate_thickness || 50;
     }
 
     displayResults(data) {
@@ -109,20 +102,23 @@ export class UiManager {
         resultsDiv.innerHTML = '';
 
         // 显示摘要
+        const byTypeHtml = data.summary.by_type ?
+            Object.entries(data.summary.by_type).map(([type, count]) => `
+                <div class="stat-item">
+                    <div class="stat-value">${count}</div>
+                    <div class="stat-label">${type}</div>
+                </div>
+            `).join('') : '';
+
         const summaryHtml = `
             <div class="result-summary">
                 <h4>检测摘要</h4>
                 <div class="summary-stats">
                     <div class="stat-item">
-                        <div class="stat-value">${data.summary.total}</div>
+                        <div class="stat-value">${data.summary.total || 0}</div>
                         <div class="stat-label">总焊缝数</div>
                     </div>
-                    ${Object.entries(data.summary.by_type).map(([type, count]) => `
-                        <div class="stat-item">
-                            <div class="stat-value">${count}</div>
-                            <div class="stat-label">${this.getWeldTypeName(type)}</div>
-                        </div>
-                    `).join('')}
+                    ${byTypeHtml}
                 </div>
             </div>
         `;
@@ -131,16 +127,18 @@ export class UiManager {
         // 显示详细列表
         if (data.welds && data.welds.length > 0) {
             const weldsHtml = data.welds.map((weld, index) => `
-                <div class="result-item ${weld.type}">
+                <div class="result-item fillet">
                     <div class="result-header">
-                        <span class="result-type">${this.getWeldTypeName(weld.type)}</span>
+                        <span class="result-type">${weld.subtype}</span>
                         <span class="result-confidence">${(weld.confidence * 100).toFixed(1)}%</span>
                     </div>
                     <div class="result-details">
+                        <div>ID: ${weld.id}</div>
                         <div>角度: ${weld.angle.toFixed(2)}°</div>
                         <div>长度: ${weld.length.toFixed(2)}mm</div>
+                        <div>板厚: ${weld.plate1_thickness ? weld.plate1_thickness.toFixed(1) : '-'}×${weld.plate2_thickness ? weld.plate2_thickness.toFixed(1) : '-'}mm</div>
+                        <div>质量评分: ${weld.quality_score}/100</div>
                         <div>位置: ${weld.position.map(p => p.toFixed(1)).join(', ')}</div>
-                        <div>类型: ${weld.is_linear ? '直线' : '曲线'}</div>
                     </div>
                 </div>
             `).join('');
@@ -193,10 +191,10 @@ export class UiManager {
 
     getWeldTypeName(type) {
         const names = {
-            'fillet': '角焊缝',
-            'butt': '对接焊缝',
-            'lap': '搭接焊缝',
-            't-shape': 'T型焊缝'
+            'corner': '角接头',
+            'L_CORNER': 'L型角接',
+            'V_CORNER': 'V型角接',
+            'T_CORNER': 'T型角接'
         };
         return names[type] || type;
     }

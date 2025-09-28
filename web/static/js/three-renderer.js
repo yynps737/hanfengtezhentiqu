@@ -20,6 +20,17 @@ export class ThreeRenderer {
         this.axisMode = 0; // 0: XYZ, 1: XZY, 2: YXZ, 3: YZX, 4: ZXY, 5: ZYX
         this.cadMode = true; // true: CAD模式(Z向上), false: Three.js模式(Y向上)
 
+        // 边选择相关
+        this.edgeObjects = [];  // 存储所有边的Three.js对象
+        this.selectedEdges = new Set();  // 存储选中的边ID
+        this.isEdgeSelectionMode = false;  // 是否在边选择模式
+        this.edgeGroup = null;  // 边的组对象
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+
+        // 绑定事件处理函数，保持引用以便移除
+        this.boundOnEdgeClick = this.onEdgeClick.bind(this);
+
         this.init();
     }
 
@@ -174,10 +185,11 @@ export class ThreeRenderer {
     displayMesh(meshData) {
         console.log('显示网格数据:', {
             vertices: meshData.vertices ? meshData.vertices.length / 3 : 0,
-            faces: meshData.faces ? meshData.faces.length / 3 : 0
+            faces: meshData.faces ? meshData.faces.length / 3 : 0,
+            edges: meshData.edges ? meshData.edges.length : 0
         });
 
-        // 移除之前的模型
+        // 移除之前的模型和边
         if (this.currentModel) {
             this.scene.remove(this.currentModel);
             this.currentModel.geometry?.dispose();
@@ -206,6 +218,11 @@ export class ThreeRenderer {
         // 计算包围盒和包围球
         geometry.computeBoundingBox();
         geometry.computeBoundingSphere();
+
+        // 如果有边数据，创建边对象（用于选择）
+        if (meshData.edges && meshData.edges.length > 0) {
+            this.createEdgeObjects(meshData.edges);
+        }
 
         // 创建材质
         const material = new THREE.MeshPhongMaterial({
@@ -569,11 +586,191 @@ export class ThreeRenderer {
         }
     }
 
+    clearHighlights() {
+        // 清除所有焊缝/接头高亮标记
+        const highlightsToRemove = this.scene.children.filter(child =>
+            child.userData.isWeldHighlight
+        );
+
+        highlightsToRemove.forEach(obj => {
+            this.scene.remove(obj);
+            obj.geometry?.dispose();
+            obj.material?.dispose();
+        });
+
+        console.log(`清除了 ${highlightsToRemove.length} 个高亮标记`);
+    }
+
+    clearAll() {
+        // 清除模型
+        if (this.currentModel) {
+            this.scene.remove(this.currentModel);
+            this.currentModel.geometry?.dispose();
+            this.currentModel.material?.dispose();
+            this.currentModel = null;
+        }
+
+        // 清除高亮
+        this.clearHighlights();
+    }
+
+    // 边选择功能
+    enterEdgeSelectionMode() {
+        this.isEdgeSelectionMode = true;
+        this.selectedEdges.clear();
+
+        // 添加点击事件监听
+        this.renderer.domElement.addEventListener('click', this.boundOnEdgeClick);
+
+        // 显示所有边
+        this.showAllEdges();
+
+        console.log('进入边选择模式');
+        console.log('当前边对象数量:', this.edgeObjects.length);
+    }
+
+    exitEdgeSelectionMode() {
+        this.isEdgeSelectionMode = false;
+
+        // 移除点击事件监听
+        this.renderer.domElement.removeEventListener('click', this.boundOnEdgeClick);
+
+        // 隐藏边
+        this.hideAllEdges();
+
+        console.log('退出边选择模式');
+    }
+
+    showAllEdges() {
+        if (!this.edgeGroup) return;
+
+        this.edgeGroup.visible = true;
+
+        // 重置所有边的颜色
+        this.edgeGroup.children.forEach(edge => {
+            edge.material.color.setHex(0x0000ff);  // 默认蓝色
+        });
+    }
+
+    hideAllEdges() {
+        if (this.edgeGroup) {
+            this.edgeGroup.visible = false;
+        }
+    }
+
+    createEdgeObjects(edgesData) {
+        // 移除旧的边组
+        if (this.edgeGroup) {
+            this.scene.remove(this.edgeGroup);
+            this.edgeGroup.children.forEach(child => {
+                child.geometry?.dispose();
+                child.material?.dispose();
+            });
+        }
+
+        // 清空边对象数组
+        this.edgeObjects = [];
+
+        // 创建新的边组
+        this.edgeGroup = new THREE.Group();
+        this.edgeGroup.name = 'edges';
+        this.edgeGroup.visible = false;  // 默认隐藏
+
+        edgesData.forEach(edgeData => {
+            const points = [];
+            for (let i = 0; i < edgeData.points.length; i += 3) {
+                points.push(new THREE.Vector3(
+                    edgeData.points[i],
+                    edgeData.points[i + 1],
+                    edgeData.points[i + 2]
+                ));
+            }
+
+            // 创建线条几何体
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+            // 创建材质
+            const material = new THREE.LineBasicMaterial({
+                color: 0x0000ff,  // 默认蓝色
+                linewidth: 3
+            });
+
+            // 创建线条对象
+            const line = new THREE.Line(geometry, material);
+            line.userData.edgeId = edgeData.id;
+            line.name = edgeData.id;
+
+            this.edgeGroup.add(line);
+            this.edgeObjects.push(line);
+        });
+
+        this.scene.add(this.edgeGroup);
+        console.log(`创建了 ${edgesData.length} 条边的显示对象`);
+    }
+
+    onEdgeClick(event) {
+        if (!this.isEdgeSelectionMode) return;
+
+        console.log('点击事件触发, 边对象数量:', this.edgeObjects.length);
+
+        // 计算鼠标位置
+        const rect = this.renderer.domElement.getBoundingClientRect();
+        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        // 发射射线
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+
+        // 检测交叉的边
+        const intersects = this.raycaster.intersectObjects(this.edgeObjects);
+        console.log('检测到的交叉对象:', intersects.length);
+
+        if (intersects.length > 0) {
+            const clickedEdge = intersects[0].object;
+            const edgeId = clickedEdge.userData.edgeId;
+
+            this.toggleEdgeSelection(edgeId, clickedEdge);
+        }
+    }
+
+    toggleEdgeSelection(edgeId, edgeObject) {
+        if (this.selectedEdges.has(edgeId)) {
+            // 取消选择
+            this.selectedEdges.delete(edgeId);
+            edgeObject.material.color.setHex(0x0000ff);  // 恢复蓝色
+            console.log(`取消选中边: ${edgeId}, 当前选中数量: ${this.selectedEdges.size}`);
+        } else {
+            // 选择边
+            this.selectedEdges.add(edgeId);
+            edgeObject.material.color.setHex(0x9f00ff);  // 紫色高亮
+            console.log(`选中边: ${edgeId}, 当前选中数量: ${this.selectedEdges.size}`);
+
+        // 通知EdgeSelector更新选中列表
+        const event = new CustomEvent('edgeSelectionChanged', {
+            detail: { selectedEdges: Array.from(this.selectedEdges) }
+        });
+        document.dispatchEvent(event);
+    }
+
+    getSelectedEdges() {
+        console.log('获取选中的边, 数量:', this.selectedEdges.size, '边ID:', Array.from(this.selectedEdges));
+        return Array.from(this.selectedEdges);
+    }
+
     dispose() {
         // 清理资源
         if (this.currentModel) {
             this.currentModel.geometry?.dispose();
             this.currentModel.material?.dispose();
+        }
+
+        // 清理边对象
+        if (this.edgeGroup) {
+            this.edgeGroup.children.forEach(child => {
+                child.geometry?.dispose();
+                child.material?.dispose();
+            });
+            this.scene.remove(this.edgeGroup);
         }
 
         this.renderer?.dispose();
