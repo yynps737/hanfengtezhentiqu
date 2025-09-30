@@ -1,317 +1,202 @@
 /**
- * 焊缝特征提取研发平台 - 主应用
- * 使用 Three.js r180 ES模块
+ * 主程序 - 极简版
+ * 只处理文件上传和3D渲染
  */
 
 import { ThreeRenderer } from './three-renderer.js';
-import { ApiClient } from './api-client.js';
-import { UiManager } from './ui-manager.js';
-import { EdgeSelector } from './edge-selector.js';
 
-class WeldDetectionApp {
+class App {
     constructor() {
+        // Three.js 渲染器
         this.renderer = null;
-        this.apiClient = null;
-        this.uiManager = null;
-        this.edgeSelector = null;
+
+        // DOM 元素
+        this.uploadArea = document.getElementById('uploadArea');
+        this.fileInput = document.getElementById('fileInput');
+        this.fileInfo = document.getElementById('fileInfo');
+        this.fileName = document.getElementById('fileName');
+        this.clearBtn = document.getElementById('clearBtn');
+        this.statusMessage = document.getElementById('statusMessage');
+        this.loadingOverlay = document.getElementById('loadingOverlay');
+        this.resetViewBtn = document.getElementById('resetViewBtn');
+        this.toggleWireframeBtn = document.getElementById('toggleWireframeBtn');
+        this.toggleGridBtn = document.getElementById('toggleGridBtn');
+        this.toggleAxesBtn = document.getElementById('toggleAxesBtn');
+
+        this.init();
     }
 
-    async init() {
-        try {
-            console.log('初始化焊缝检测应用...');
+    init() {
+        console.log('[App] 开始初始化...');
 
-            // 初始化组件
-            this.apiClient = new ApiClient();
-            this.uiManager = new UiManager();
+        // 初始化 Three.js 渲染器
+        this.renderer = new ThreeRenderer('three-container');
 
-            // 初始化UI
-            this.uiManager.init();
+        // 绑定事件
+        this.bindEvents();
 
-            // 初始化Three.js渲染器
-            const container = document.getElementById('threejs-viewer');
-            if (container) {
-                this.renderer = new ThreeRenderer(container);
-            } else {
-                throw new Error('无法找到3D视图容器');
+        console.log('[App] 应用初始化完成');
+    }
+
+    bindEvents() {
+        console.log('[App] 绑定事件...');
+
+        // 点击上传区域
+        this.uploadArea.addEventListener('click', () => {
+            console.log('[App] 点击上传区域');
+            this.fileInput.click();
+        });
+
+        // 文件选择
+        this.fileInput.addEventListener('change', (e) => {
+            console.log('[App] 文件选择事件触发');
+            const file = e.target.files[0];
+            if (file) {
+                console.log('[App] 选择的文件:', file.name);
+                this.handleFile(file);
             }
-
-            // 初始化边选择器（需要渲染器引用）
-            this.edgeSelector = new EdgeSelector(this.apiClient, this.renderer);
-
-            // 设置事件监听
-            this.setupEventListeners();
-
-            // 加载默认参数
-            await this.loadDefaultParameters();
-
-            // 设置全局函数（用于HTML onclick事件）
-            this.setupGlobalFunctions();
-
-            console.log('应用初始化完成');
-            this.uiManager.showMessage('应用已就绪', 'success');
-
-        } catch (error) {
-            console.error('应用初始化失败:', error);
-            this.uiManager?.showMessage(`初始化失败: ${error.message}`, 'error');
-        }
-    }
-
-    setupEventListeners() {
-        // 文件选择事件
-        document.addEventListener('fileSelected', (e) => {
-            this.handleFileUpload(e.detail.file);
         });
 
-        // 分析按钮事件
-        document.getElementById('analyzeBtn').addEventListener('click', () => {
-            this.analyzeModel();
+        // 拖拽上传
+        this.uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            this.uploadArea.classList.add('drag-over');
         });
 
-        // 导出按钮事件
-        document.getElementById('exportJsonBtn').addEventListener('click', () => {
-            this.exportResults('json');
+        this.uploadArea.addEventListener('dragleave', () => {
+            this.uploadArea.classList.remove('drag-over');
         });
 
-        document.getElementById('exportCsvBtn').addEventListener('click', () => {
-            this.exportResults('csv');
-        });
+        this.uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            this.uploadArea.classList.remove('drag-over');
 
-        // 轴向变化事件监听
-        document.addEventListener('axisModeChanged', (e) => {
-            this.uiManager.showMessage(`坐标系已切换至: ${e.detail.name}`, 'info');
-        });
-    }
-
-    setupGlobalFunctions() {
-        // 将函数绑定到全局作用域，用于HTML onclick事件
-        window.updateParameters = () => this.updateParameters();
-        window.clearFile = () => this.clearFile();
-        window.resetView = () => this.resetView();
-        window.toggleWireframe = () => this.toggleWireframe();
-        window.toggleGrid = () => this.toggleGrid();
-        window.toggleAxes = () => this.toggleAxes();
-        window.switchAxisMode = () => this.switchAxisMode();
-        window.openFullscreen = () => this.openFullscreen();
-
-        // 边选择相关函数
-        window.toggleEdgeSelectionMode = () => this.toggleEdgeSelectionMode();
-        window.analyzeSelectedEdges = () => this.analyzeSelectedEdges();
-        window.clearSelectedEdges = () => this.clearSelectedEdges();
-        window.exportEdgeAnalysis = (format) => this.exportEdgeAnalysis(format);
-    }
-
-    async handleFileUpload(file) {
-        try {
-            this.uiManager.showProgress('上传文件中...');
-
-            const result = await this.apiClient.uploadFile(file);
-
-            this.uiManager.showFileInfo(file.name);
-            this.uiManager.setAnalyzeButtonEnabled(true);
-
-            // 显示3D模型
-            if (result.mesh) {
-                this.renderer.displayMesh(result.mesh);
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                this.handleFile(file);
             }
+        });
 
-            this.uiManager.showMessage('文件上传成功', 'success');
+        // 清除按钮
+        this.clearBtn.addEventListener('click', () => {
+            this.clearModel();
+        });
 
-        } catch (error) {
-            this.uiManager.showMessage(`上传失败: ${error.message}`, 'error');
-        } finally {
-            this.uiManager.hideProgress();
-        }
-    }
-
-    async analyzeModel() {
-        if (!this.apiClient.hasCurrentFile()) {
-            this.uiManager.showMessage('请先上传STEP文件', 'error');
-            return;
-        }
-
-        try {
-            this.uiManager.showProgress('分析中...');
-
-            const parameters = this.uiManager.getParameters();
-            const result = await this.apiClient.analyzeModel(parameters);
-
-            // 验证响应数据
-            if (!result || !result.summary) {
-                throw new Error('服务器返回的数据格式错误');
-            }
-
-            this.uiManager.displayResults(result);
-
-            // 在3D视图中高亮焊缝
-            if (result.welds && result.welds.length > 0) {
-                this.renderer.highlightWelds(result.welds);
-            }
-
-            this.uiManager.showMessage(
-                `分析完成: 找到 ${result.summary.total || 0} 条焊缝`,
-                'success'
-            );
-
-        } catch (error) {
-            this.uiManager.showMessage(`分析失败: ${error.message}`, 'error');
-        } finally {
-            this.uiManager.hideProgress();
-        }
-    }
-
-    async loadDefaultParameters() {
-        try {
-            const params = await this.apiClient.getParameters();
-            this.uiManager.setParameters(params);
-        } catch (error) {
-            console.warn('加载默认参数失败:', error);
-        }
-    }
-
-    async updateParameters() {
-        try {
-            const parameters = this.uiManager.getParameters();
-            await this.apiClient.updateParameters(parameters);
-            this.uiManager.showMessage('参数更新成功', 'success');
-        } catch (error) {
-            this.uiManager.showMessage(`参数更新失败: ${error.message}`, 'error');
-        }
-    }
-
-    async exportResults(format) {
-        if (!this.uiManager.getAnalysisResults()) {
-            this.uiManager.showMessage('无结果可导出', 'error');
-            return;
-        }
-
-        try {
-            await this.apiClient.exportResults(format);
-            this.uiManager.showMessage(`导出${format.toUpperCase()}成功`, 'success');
-        } catch (error) {
-            this.uiManager.showMessage(`导出失败: ${error.message}`, 'error');
-        }
-    }
-
-    clearFile() {
-        this.apiClient.clearSession();
-        this.uiManager.clearFileInfo();
-        this.uiManager.setAnalyzeButtonEnabled(false);
-
-        // 清空3D视图的模型和所有分析结果
-        if (this.renderer) {
-            this.renderer.clearAll();
-        }
-
-        this.uiManager.showMessage('文件已清除', 'info');
-    }
-
-    resetView() {
-        if (this.renderer) {
+        // 控制按钮
+        this.resetViewBtn.addEventListener('click', () => {
             this.renderer.resetView();
-        }
-    }
+        });
 
-    toggleWireframe() {
-        if (this.renderer) {
+        this.toggleWireframeBtn.addEventListener('click', () => {
             this.renderer.toggleWireframe();
-        }
+        });
+
+        // 网格切换
+        this.toggleGridBtn.addEventListener('click', () => {
+            const visible = this.renderer.toggleGrid();
+            this.toggleGridBtn.style.opacity = visible ? '1' : '0.5';
+        });
+
+        // 坐标轴切换
+        this.toggleAxesBtn.addEventListener('click', () => {
+            const visible = this.renderer.toggleAxes();
+            this.toggleAxesBtn.style.opacity = visible ? '1' : '0.5';
+        });
     }
 
-    toggleGrid() {
-        if (this.renderer) {
-            this.renderer.toggleGrid();
-        }
-    }
+    async handleFile(file) {
+        console.log('[App] 处理文件:', file.name, file.size, 'bytes');
 
-    toggleAxes() {
-        if (this.renderer) {
-            this.renderer.toggleAxes();
-        }
-    }
+        // 检查文件类型
+        const ext = file.name.split('.').pop().toLowerCase();
+        console.log('[App] 文件扩展名:', ext);
 
-    switchAxisMode() {
-        if (this.renderer) {
-            this.renderer.switchAxisMode();
-        }
-    }
-
-    openFullscreen() {
-        // 准备要传递的数据
-        const modelData = {
-            filename: this.apiClient.getCurrentFileName(),
-            mesh: null,
-            welds: null
-        };
-
-        // 获取当前模型数据
-        if (this.renderer && this.renderer.currentModel) {
-            const geometry = this.renderer.currentModel.geometry;
-            if (geometry) {
-                // 提取顶点数据
-                const vertices = geometry.attributes.position.array;
-                const indices = geometry.index ? geometry.index.array : null;
-
-                modelData.mesh = {
-                    vertices: Array.from(vertices),
-                    faces: indices ? Array.from(indices) : []
-                };
-            }
-        }
-
-        // 获取焊缝数据
-        const analysisResults = this.uiManager.getAnalysisResults();
-        if (analysisResults && analysisResults.welds) {
-            modelData.welds = analysisResults.welds;
-        }
-
-        // 将数据存储到sessionStorage
-        sessionStorage.setItem('modelData', JSON.stringify(modelData));
-
-        // 打开新窗口
-        const fullscreenWindow = window.open(
-            '/fullscreen.html',
-            'fullscreen3D',
-            'width=' + screen.width + ',height=' + screen.height + ',fullscreen=yes'
-        );
-
-        // 如果浏览器阻止弹窗，尝试在当前标签页打开
-        if (!fullscreenWindow || fullscreenWindow.closed) {
-            window.location.href = '/fullscreen.html';
-        }
-    }
-
-    // 边选择相关方法
-    toggleEdgeSelectionMode() {
-        if (!this.apiClient.hasCurrentFile()) {
-            this.uiManager.showMessage('请先上传STEP文件', 'error');
+        if (!['step', 'stp'].includes(ext)) {
+            console.log('[App] 文件类型不支持');
+            this.showStatus('请上传 STEP 或 STP 文件', 'error');
             return;
         }
 
-        const isActive = this.edgeSelector.toggleSelectionMode();
-        this.uiManager.showMessage(
-            isActive ? '边选择模式已开启' : '边选择模式已关闭',
-            'info'
-        );
+        // 显示加载动画
+        this.showLoading(true);
+        this.showStatus('正在上传文件...', 'success');
+        console.log('[App] 开始上传文件到服务器...');
+
+        try {
+            // 上传文件
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const response = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // 显示文件信息
+                this.fileName.textContent = data.filename;
+                this.fileInfo.classList.add('show');
+                this.showStatus('文件上传成功！', 'success');
+
+                // 渲染3D模型
+                if (data.mesh) {
+                    this.renderer.renderMesh(data.mesh);
+                    this.showStatus('模型加载成功！', 'success');
+                }
+            } else {
+                throw new Error(data.error || '上传失败');
+            }
+
+        } catch (error) {
+            console.error('文件处理失败:', error);
+            this.showStatus('错误: ' + error.message, 'error');
+        } finally {
+            this.showLoading(false);
+        }
     }
 
-    async analyzeSelectedEdges() {
-        await this.edgeSelector.analyzeSelectedEdges();
+    async clearModel() {
+        try {
+            // 调用后端清除API
+            await fetch('/api/clear', {
+                method: 'POST'
+            });
+
+            // 清除前端显示
+            this.fileInfo.classList.remove('show');
+            this.fileName.textContent = '';
+            this.fileInput.value = '';
+            this.renderer.clearMesh();
+            this.showStatus('模型已清除', 'success');
+
+        } catch (error) {
+            console.error('清除失败:', error);
+            this.showStatus('清除失败: ' + error.message, 'error');
+        }
     }
 
-    clearSelectedEdges() {
-        this.edgeSelector.clearSelection();
-        this.uiManager.showMessage('已清除边选择', 'info');
+    showLoading(show) {
+        if (show) {
+            this.loadingOverlay.classList.add('show');
+        } else {
+            this.loadingOverlay.classList.remove('show');
+        }
     }
 
-    async exportEdgeAnalysis(format) {
-        await this.edgeSelector.exportAnalysis(format);
+    showStatus(message, type) {
+        this.statusMessage.textContent = message;
+        this.statusMessage.className = 'status-message show ' + type;
+
+        // 3秒后自动隐藏
+        setTimeout(() => {
+            this.statusMessage.classList.remove('show');
+        }, 3000);
     }
 }
 
-// 应用启动
-document.addEventListener('DOMContentLoaded', () => {
-    const app = new WeldDetectionApp();
-    app.init().catch(error => {
-        console.error('应用启动失败:', error);
-    });
+// 启动应用
+window.addEventListener('DOMContentLoaded', () => {
+    new App();
 });

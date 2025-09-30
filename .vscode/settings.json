@@ -1,0 +1,5 @@
+{
+    "editor.defaultFormatter": "ms-python.python",
+    "editor.defaultFoldingRangeProvider": "ms-python.python",
+    "notebook.defaultFormatter": "vscode.json-language-features"
+}
