@@ -23,6 +23,16 @@ class App {
         this.toggleGridBtn = document.getElementById('toggleGridBtn');
         this.toggleAxesBtn = document.getElementById('toggleAxesBtn');
 
+        // 边选择相关元素
+        this.edgeSelectionPanel = document.getElementById('edgeSelectionPanel');
+        this.toggleEdgeSelectionBtn = document.getElementById('toggleEdgeSelectionBtn');
+        this.confirmEdgesBtn = document.getElementById('confirmEdgesBtn');
+        this.exitEdgeSelectionBtn = document.getElementById('exitEdgeSelectionBtn');
+        this.edgeSelectionInfo = document.getElementById('edgeSelectionInfo');
+
+        // 边选择状态
+        this.isEdgeSelectionMode = false;
+
         this.init();
     }
 
@@ -34,6 +44,11 @@ class App {
 
         // 绑定事件
         this.bindEvents();
+
+        // 监听边选择变化事件
+        window.addEventListener('edgeSelectionChanged', (event) => {
+            this.updateEdgeListUI(event.detail);
+        });
 
         console.log('[App] 应用初始化完成');
     }
@@ -102,6 +117,19 @@ class App {
             const visible = this.renderer.toggleAxes();
             this.toggleAxesBtn.style.opacity = visible ? '1' : '0.5';
         });
+
+        // 边选择按钮
+        this.toggleEdgeSelectionBtn.addEventListener('click', () => {
+            this.toggleEdgeSelectionMode();
+        });
+
+        this.confirmEdgesBtn.addEventListener('click', () => {
+            this.confirmEdgeSelection();
+        });
+
+        this.exitEdgeSelectionBtn.addEventListener('click', () => {
+            this.exitEdgeSelectionMode();
+        });
     }
 
     async handleFile(file) {
@@ -145,6 +173,15 @@ class App {
                     this.renderer.renderMesh(data.mesh);
                     this.showStatus('模型加载成功！', 'success');
                 }
+
+                // 渲染边
+                if (data.edges) {
+                    this.renderer.renderEdges(data.edges);
+                    console.log(`[App] 加载 ${data.edges.length} 条边`);
+
+                    // 显示边选择面板
+                    this.edgeSelectionPanel.style.display = 'block';
+                }
             } else {
                 throw new Error(data.error || '上传失败');
             }
@@ -169,6 +206,9 @@ class App {
             this.fileName.textContent = '';
             this.fileInput.value = '';
             this.renderer.clearMesh();
+            this.renderer.clearSelectedEdges();
+            this.edgeSelectionPanel.style.display = 'none';
+            this.isEdgeSelectionMode = false;
             this.showStatus('模型已清除', 'success');
 
         } catch (error) {
@@ -194,9 +234,63 @@ class App {
             this.statusMessage.classList.remove('show');
         }, 3000);
     }
+
+    updateEdgeListUI(detail) {
+        const { selectedEdges, count } = detail;
+
+        // 更新边选择信息显示
+        if (count === 0) {
+            this.edgeSelectionInfo.textContent = '未选择边';
+            this.edgeSelectionInfo.style.color = '#999';
+            this.confirmEdgesBtn.disabled = true;
+        } else {
+            this.edgeSelectionInfo.innerHTML = `
+                <div style="font-weight: bold; color: #333;">已选择 ${count} 条边</div>
+                ${selectedEdges.map(edge => `
+                    <div style="margin-top: 5px; font-size: 12px;">边 ${edge.id}</div>
+                `).join('')}
+            `;
+            this.confirmEdgesBtn.disabled = false;
+        }
+    }
+
+    toggleEdgeSelectionMode() {
+        this.isEdgeSelectionMode = !this.isEdgeSelectionMode;
+
+        if (this.isEdgeSelectionMode) {
+            // 开启选边模式
+            this.renderer.setEdgeSelectionEnabled(true);
+            this.toggleEdgeSelectionBtn.textContent = '停止选边';
+            this.toggleEdgeSelectionBtn.classList.add('active');
+            this.showStatus('选边模式已开启，点击边进行选择', 'success');
+        } else {
+            // 关闭选边模式
+            this.renderer.setEdgeSelectionEnabled(false);
+            this.toggleEdgeSelectionBtn.textContent = '开始选边';
+            this.toggleEdgeSelectionBtn.classList.remove('active');
+            this.showStatus('选边模式已关闭', 'success');
+        }
+    }
+
+    confirmEdgeSelection() {
+        const selectedEdges = this.renderer.getSelectedEdges();
+        console.log('[App] 确定选择的边:', selectedEdges);
+        this.showStatus(`已确定选择 ${selectedEdges.length} 条边`, 'success');
+        // TODO: 这里可以添加后续处理逻辑
+    }
+
+    exitEdgeSelectionMode() {
+        // 退出选边模式并清空选择
+        this.isEdgeSelectionMode = false;
+        this.renderer.setEdgeSelectionEnabled(false);
+        this.renderer.clearSelectedEdges();
+        this.toggleEdgeSelectionBtn.textContent = '开始选边';
+        this.toggleEdgeSelectionBtn.classList.remove('active');
+        this.showStatus('已退出选边模式', 'success');
+    }
 }
 
 // 启动应用
 window.addEventListener('DOMContentLoaded', () => {
-    new App();
+    window.appInstance = new App();
 });

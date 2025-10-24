@@ -174,6 +174,82 @@
             border-color: #1976d2;
         }
 
+        .control-btn.active {
+            background: #1976d2;
+            color: white;
+            border-color: #1976d2;
+        }
+
+        /* 边选择控制区 */
+        .edge-selection-panel {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f5f5f5;
+            border-radius: 8px;
+        }
+
+        .edge-selection-panel h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .edge-btn {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .edge-btn-start {
+            background: #4caf50;
+            color: white;
+        }
+
+        .edge-btn-start:hover {
+            background: #45a049;
+        }
+
+        .edge-btn-start.active {
+            background: #ff9800;
+        }
+
+        .edge-btn-confirm {
+            background: #2196f3;
+            color: white;
+        }
+
+        .edge-btn-confirm:hover {
+            background: #1976d2;
+        }
+
+        .edge-btn-confirm:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .edge-btn-exit {
+            background: #f44336;
+            color: white;
+        }
+
+        .edge-btn-exit:hover {
+            background: #d32f2f;
+        }
+
+        .edge-selection-info {
+            margin-top: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #666;
+        }
+
         .loading-overlay {
             position: absolute;
             top: 0;
@@ -225,6 +301,23 @@
             <div class="file-info" id="fileInfo">
                 <div class="file-name" id="fileName"></div>
                 <button class="clear-btn" id="clearBtn">清除模型</button>
+            </div>
+
+            <!-- 边选择控制区 -->
+            <div class="edge-selection-panel" id="edgeSelectionPanel" style="display: none;">
+                <h3>🔧 边选择</h3>
+                <button class="edge-btn edge-btn-start" id="toggleEdgeSelectionBtn">
+                    开始选边
+                </button>
+                <button class="edge-btn edge-btn-confirm" id="confirmEdgesBtn" disabled>
+                    确定
+                </button>
+                <button class="edge-btn edge-btn-exit" id="exitEdgeSelectionBtn">
+                    退出选边
+                </button>
+                <div class="edge-selection-info" id="edgeSelectionInfo">
+                    未选择边
+                </div>
             </div>
 
             <div class="status-message" id="statusMessage"></div>

@@ -22,7 +22,18 @@ export class ThreeRenderer {
         this.isGridVisible = true;
         this.isAxesVisible = true;
 
+        // 边选择相关
+        this.edgesGroup = null;           // 所有边的容器（线段）
+        this.selectedEdgesGroup = null;   // 已选边的容器（圆柱体）
+        this.edgesData = [];              // 边数据数组
+        this.selectedEdges = new Set();   // 已选中边的ID集合
+        this.raycaster = new THREE.Raycaster();
+        this.mouse = new THREE.Vector2();
+        this.edgeSelectionEnabled = false; // 选边模式开关
+        this.hoveredEdgeId = null;        // 当前悬停的边ID
+
         this.init();
+        this.setupEdgeSelection();
     }
 
     init() {
@@ -285,5 +296,311 @@ export class ThreeRenderer {
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(width, height);
+    }
+
+    /**
+     * 设置边选择功能
+     */
+    setupEdgeSelection() {
+        // 监听鼠标点击事件
+        this.container.addEventListener('click', (event) => this.onEdgeClick(event));
+
+        // 监听鼠标移动事件（悬停高亮）
+        this.container.addEventListener('mousemove', (event) => this.onEdgeHover(event));
+    }
+
+    /**
+     * 渲染边
+     */
+    renderEdges(edgesData) {
+        // 清除旧边
+        if (this.edgesGroup) {
+            this.scene.remove(this.edgesGroup);
+            this.edgesGroup.traverse((obj) => {
+                if (obj.geometry) obj.geometry.dispose();
+                if (obj.material) obj.material.dispose();
+            });
+        }
+
+        if (this.selectedEdgesGroup) {
+            this.scene.remove(this.selectedEdgesGroup);
+            this.selectedEdgesGroup.traverse((obj) => {
+                if (obj.geometry) obj.geometry.dispose();
+                if (obj.material) obj.material.dispose();
+            });
+        }
+
+        this.edgesData = edgesData;
+        this.edgesGroup = new THREE.Group();
+        this.edgesGroup.name = 'edges';
+
+        this.selectedEdgesGroup = new THREE.Group();
+        this.selectedEdgesGroup.name = 'selectedEdges';
+
+        // 为每条边创建线段
+        edgesData.forEach(edge => {
+            const geometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(...edge.start),
+                new THREE.Vector3(...edge.end)
+            ]);
+
+            const material = new THREE.LineBasicMaterial({
+                color: 0x000000,      // 黑色边线
+                linewidth: 2,
+                opacity: 0.6,
+                transparent: true
+            });
+
+            const line = new THREE.Line(geometry, material);
+            line.userData.edgeId = edge.id;     // 存储显示用ID
+            line.userData.edgeHash = edge.hash;  // 存储OCC永久标识符
+            line.userData.edgeData = edge;       // 存储完整边数据
+            this.edgesGroup.add(line);
+        });
+
+        this.scene.add(this.edgesGroup);
+        this.scene.add(this.selectedEdgesGroup);
+        console.log(`渲染边: ${edgesData.length} 条`);
+    }
+
+    /**
+     * 鼠标悬停边（高亮效果）- 重写版本，修复黄色残留问题
+     */
+    onEdgeHover(event) {
+        // 只有在开启选边模式时才响应悬停
+        if (!this.edgesGroup || !this.edgeSelectionEnabled) {
+            // 恢复默认光标
+            this.container.style.cursor = 'default';
+            this.clearHoverEffect();
+            return;
+        }
+
+        // 计算鼠标位置
+        const rect = this.container.getBoundingClientRect();
+        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        // 射线检测（缩小拾取范围）
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        this.raycaster.params.Line.threshold = 2;  // 2像素容差
+
+        const intersects = this.raycaster.intersectObjects(this.edgesGroup.children, false);
+
+        if (intersects.length > 0) {
+            const hoveredLine = intersects[0].object;
+            const edgeId = hoveredLine.userData.edgeId;
+
+            // 忽略已选中的边（已经隐藏或变成圆柱体）
+            if (this.selectedEdges.has(edgeId)) {
+                this.container.style.cursor = 'default';
+                this.clearHoverEffect();
+                return;
+            }
+
+            // 如果悬停在新的边上
+            if (edgeId !== this.hoveredEdgeId) {
+                this.clearHoverEffect();
+                this.hoveredEdgeId = edgeId;
+
+                // 应用悬停高亮效果
+                hoveredLine.material.color.setHex(0xffeb3b);  // 黄色高亮
+                hoveredLine.material.opacity = 1.0;
+                hoveredLine.material.linewidth = 3;  // 稍粗一点
+            }
+
+            // 改变鼠标指针为手型
+            this.container.style.cursor = 'pointer';
+        } else {
+            // 没有悬停在边上
+            this.container.style.cursor = 'default';
+            this.clearHoverEffect();
+        }
+    }
+
+    /**
+     * 清除悬停高亮效果 - 重写版本，无条件恢复
+     */
+    clearHoverEffect() {
+        if (this.hoveredEdgeId !== null) {
+            // 无条件恢复原始颜色（解决时序问题）
+            this.edgesGroup.children.forEach(line => {
+                if (line.userData.edgeId === this.hoveredEdgeId) {
+                    // 恢复默认黑色样式
+                    line.material.color.setHex(0x000000);
+                    line.material.opacity = 0.6;
+                    line.material.linewidth = 2;
+                }
+            });
+            this.hoveredEdgeId = null;
+        }
+    }
+
+    /**
+     * 鼠标点击边
+     */
+    onEdgeClick(event) {
+        // 只有在开启选边模式时才响应点击
+        if (!this.edgesGroup || !this.edgeSelectionEnabled) return;
+
+        // 计算鼠标位置（归一化设备坐标）
+        const rect = this.container.getBoundingClientRect();
+        this.mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+        this.mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+        // 射线检测
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        this.raycaster.params.Line.threshold = 2;  // 缩小点击容差
+
+        const intersects = this.raycaster.intersectObjects(this.edgesGroup.children, false);
+
+        if (intersects.length > 0) {
+            const clickedLine = intersects[0].object;
+            const edgeId = clickedLine.userData.edgeId;
+            const edgeData = clickedLine.userData.edgeData;
+
+            // 切换选中状态
+            if (this.selectedEdges.has(edgeId)) {
+                this.deselectEdge(edgeId);
+            } else {
+                this.selectEdge(edgeId, edgeData);
+            }
+        }
+    }
+
+    /**
+     * 设置选边模式开关
+     */
+    setEdgeSelectionEnabled(enabled) {
+        this.edgeSelectionEnabled = enabled;
+        console.log(`选边模式: ${enabled ? '开启' : '关闭'}`);
+
+        if (!enabled) {
+            // 关闭时清除悬停效果和光标
+            this.clearHoverEffect();
+            this.container.style.cursor = 'default';
+        }
+    }
+
+    /**
+     * 选中边 - 使用圆柱体实体显示
+     */
+    selectEdge(edgeId, edgeData) {
+        // 第一步：先清除悬停效果（如果当前悬停在这条边上）
+        if (this.hoveredEdgeId === edgeId) {
+            this.clearHoverEffect();
+        }
+
+        this.selectedEdges.add(edgeId);
+
+        // 隐藏原始线段，并强制恢复默认样式（防止黄色残留）
+        this.edgesGroup.children.forEach(line => {
+            if (line.userData.edgeId === edgeId) {
+                line.visible = false;
+                // 强制恢复默认样式（即使看不见，也确保状态正确）
+                line.material.color.setHex(0x000000);
+                line.material.opacity = 0.6;
+                line.material.linewidth = 2;
+            }
+        });
+
+        // 创建圆柱体代替选中的边
+        const start = new THREE.Vector3(...edgeData.start);
+        const end = new THREE.Vector3(...edgeData.end);
+        const direction = new THREE.Vector3().subVectors(end, start);
+        const length = direction.length();
+        const center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+
+        // 创建圆柱体几何体（固定半径，所有边统一粗细）
+        const radius = 0.8;  // 固定半径0.8单位（所有边统一视觉粗细）
+        const geometry = new THREE.CylinderGeometry(radius, radius, length, 8);
+
+        // 创建蓝色材质（实体）
+        const material = new THREE.MeshStandardMaterial({
+            color: 0x2196f3,      // 蓝色
+            metalness: 0.5,
+            roughness: 0.3,
+            emissive: 0x2196f3,   // 自发光蓝色
+            emissiveIntensity: 0.3
+        });
+
+        const cylinder = new THREE.Mesh(geometry, material);
+
+        // 定位和旋转圆柱体
+        cylinder.position.copy(center);
+        cylinder.quaternion.setFromUnitVectors(
+            new THREE.Vector3(0, 1, 0),  // 圆柱体默认沿Y轴
+            direction.normalize()
+        );
+
+        cylinder.userData.edgeId = edgeId;
+        cylinder.userData.edgeHash = edgeData.hash;  // 保存hash用于回溯
+        this.selectedEdgesGroup.add(cylinder);
+
+        console.log(`选中边 ${edgeId}`);
+        this.updateEdgeList();
+    }
+
+    /**
+     * 取消选中边
+     */
+    deselectEdge(edgeId) {
+        this.selectedEdges.delete(edgeId);
+
+        // 显示原始线段，并强制恢复默认样式（第三层保护）
+        this.edgesGroup.children.forEach(line => {
+            if (line.userData.edgeId === edgeId) {
+                line.visible = true;
+                // 强制恢复默认黑色样式
+                line.material.color.setHex(0x000000);
+                line.material.opacity = 0.6;
+                line.material.linewidth = 2;
+            }
+        });
+
+        // 移除圆柱体
+        const cylinderToRemove = this.selectedEdgesGroup.children.find(
+            cyl => cyl.userData.edgeId === edgeId
+        );
+        if (cylinderToRemove) {
+            this.selectedEdgesGroup.remove(cylinderToRemove);
+            cylinderToRemove.geometry.dispose();
+            cylinderToRemove.material.dispose();
+        }
+
+        console.log(`取消选中边 ${edgeId}`);
+        this.updateEdgeList();
+    }
+
+    /**
+     * 清空所有选中的边
+     */
+    clearSelectedEdges() {
+        this.selectedEdges.forEach(edgeId => {
+            this.deselectEdge(edgeId);
+        });
+        this.selectedEdges.clear();
+        this.updateEdgeList();
+    }
+
+    /**
+     * 获取已选中边的列表
+     */
+    getSelectedEdges() {
+        return Array.from(this.selectedEdges).map(edgeId => {
+            return this.edgesData.find(e => e.id === edgeId);
+        });
+    }
+
+    /**
+     * 更新边列表UI（需要在main.js中实现具体UI更新）
+     */
+    updateEdgeList() {
+        const event = new CustomEvent('edgeSelectionChanged', {
+            detail: {
+                selectedEdges: this.getSelectedEdges(),
+                count: this.selectedEdges.size
+            }
+        });
+        window.dispatchEvent(event);
     }
 }
